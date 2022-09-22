@@ -3,7 +3,7 @@
 namespace Inmarelibero\NFTManager;
 
 use Inmarelibero\NFTManager\Exception\AppException;
-use Inmarelibero\NFTManager\Exception\FileNotFoundException;
+use Inmarelibero\NFTManager\Exception\FilesystemException;
 use Inmarelibero\NFTManager\Helper\FileSystemHelper;
 use Inmarelibero\NFTManager\Model\NFT;
 use Inmarelibero\NFTManager\Operation\OperationInterface;
@@ -188,7 +188,7 @@ abstract class NFTManagerAbstract
         try {
             FileSystemHelper::deleteFile($this->getImagesFinalOutputFolder() . "/.DS_Store");
             FileSystemHelper::deleteFile($this->getMetadataFinalOutputFolder() . "/.DS_Store");
-        } catch (FileNotFoundException $exception) {
+        } catch (FilesystemException $exception) {
         }
 
         $this->executedOperations++;

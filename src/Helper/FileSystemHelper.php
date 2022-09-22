@@ -4,6 +4,7 @@ namespace Inmarelibero\NFTManager\Helper;
 
 use Inmarelibero\NFTManager\Exception\AppException;
 use Inmarelibero\NFTManager\Exception\FileNotFoundException;
+use Inmarelibero\NFTManager\Exception\FilesystemException;
 
 /**
  * Class FileSystemHelper
@@ -12,6 +13,8 @@ use Inmarelibero\NFTManager\Exception\FileNotFoundException;
 class FileSystemHelper
 {
     /**
+     * Delete (if existing) a directory and its content, and then recreate it empty
+     *
      * @param string $absolutePath
      * @throws AppException
      */
@@ -25,20 +28,28 @@ class FileSystemHelper
     }
 
     /**
+     * Create a directory, throw exception if it's already existing
+     *
      * @param string $absolutePath
-     * @throws AppException
+     * @throws FilesystemException
      */
     public static function createDirectory(string $absolutePath)
     {
+        if (file_exists($absolutePath)) {
+            throw new FilesystemException(sprintf('Directory "%s" was not created', $absolutePath));
+        }
+
         if (!mkdir($absolutePath) && !is_dir($absolutePath)) {
-            throw new AppException(sprintf('Directory "%s" was not created', $absolutePath));
+            throw new FilesystemException(sprintf('Directory "%s" was not created', $absolutePath));
         }
     }
 
     /**
+     * Delete a directory and its content recursively
+     *
      * @param string $absolutePath
      * @param false|bool $keepEmptyFolder set to true if you want to delete only the whole content of $absolutePath but leave the empty folder
-     * @throws AppException
+     * @throws FilesystemException
      */
     public static function deleteDirectory(string $absolutePath, bool $keepEmptyFolder = false): void
     {
@@ -47,7 +58,7 @@ class FileSystemHelper
         }
 
         if (!is_dir($absolutePath)) {
-            throw new AppException(sprintf('Unable to delete directory "%s": it is not a directory', $absolutePath));
+            throw new FilesystemException(sprintf('Unable to delete directory "%s": it is not a directory', $absolutePath));
         }
 
         foreach (scandir($absolutePath) as $item) {
@@ -66,50 +77,54 @@ class FileSystemHelper
 
         if ($keepEmptyFolder !== true) {
             if (!rmdir($absolutePath)) {
-                throw new AppException(sprintf('Unable to delete directory "%s"', $absolutePath));
+                throw new FilesystemException(sprintf('Unable to delete directory "%s"', $absolutePath));
             }
         }
     }
 
     /**
+     * Delete a single file
+     *
      * @param string $absolutePath
-     * @throws AppException
-     * @throws FileNotFoundException
+     * @throws FilesystemException
      */
     public static function deleteFile(string $absolutePath)
     {
         if (!file_exists($absolutePath)) {
-            throw new FileNotFoundException(sprintf('Unable to delete file "%s": file does not exist.', $absolutePath));
+            throw new FilesystemException(sprintf('Unable to delete file "%s": file does not exist.', $absolutePath));
         }
 
         if (!unlink($absolutePath)) {
-            throw new AppException(sprintf('Unable to delete file "%s".', $absolutePath));
+            throw new FilesystemException(sprintf('Unable to delete file "%s".', $absolutePath));
         }
     }
 
     /**
-     * @param string $dir
-     * @param array|string[] $extensions
-     * @return array
-     * @throws AppException
+     * Return an array with all the absolute paths of the files contained in a directory (not recursively)
+     *
+     * @param string $dir the directory to scan
+     * @return string[]
+     * @throws FilesystemException
      */
     public static function getFilesInDir(string $dir): array
     {
         if (!file_exists($dir)) {
-            throw new AppException(sprintf('Unable to get files in directory "%s": directory does not exist.', $dir));
+            throw new FilesystemException(sprintf('Unable to get files in directory "%s": directory does not exist.', $dir));
         }
 
         $output = scandir($dir);
 
         if ($output === false) {
-            throw new AppException(sprintf('Unable to scan directory "%s"', $dir));
+            throw new FilesystemException(sprintf('Unable to scan directory "%s"', $dir));
         }
 
         $output = array_filter($output, function (string $filename) {
+            // ignore files beginning with "."
             if (preg_match('#^\..*#', $filename)) {
                 return false;
             }
 
+            // ignore directories
             if (is_dir($filename)) {
                 return false;
             }
@@ -129,9 +144,11 @@ class FileSystemHelper
     }
 
     /**
+     * Copy recursively a directory into another
+     *
      * @param string $from
      * @param string $to
-     * @throws \Exception
+     * @throws FilesystemException
      */
     public static function deepCopy(string $from, string $to)
     {
@@ -140,15 +157,14 @@ class FileSystemHelper
 
         // (A1) SOURCE FOLDER CHECK
         if (!is_dir($from)) {
-            exit("$from does not exist");
+            throw new FilesystemException("$from does not exist");
         }
 
         // (A2) CREATE DESTINATION FOLDER
         if (!is_dir($to)) {
             if (!mkdir($to)) {
-                exit("Failed to create $to");
+                throw new FilesystemException("Failed to create $to");
             };
-//            echo "$to created\r\n";
         }
 
         // (A3) COPY FILES + RECURSIVE INTERNAL FOLDERS
@@ -159,9 +175,8 @@ class FileSystemHelper
                     self::deepCopy("$from$ff/", "$to$ff/");
                 } else {
                     if (!copy("$from$ff", "$to$ff")) {
-                        throw new \Exception("Error copying $from$ff to $to$ff");
+                        throw new FilesystemException("Error copying $from$ff to $to$ff");
                     }
-//                echo "$from$ff copied to $to$ff\r\n";
                 }
             }
         }
@@ -170,6 +185,8 @@ class FileSystemHelper
     }
 
     /**
+     * Convert $content into JSON format and write it in a file
+     *
      * @param string $absolutePath
      * @param array $content
      */

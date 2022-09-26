@@ -80,7 +80,7 @@ use \Inmarelibero\NFTManager\Operation\OperationUpdateMetadata
 // the ID of the last minted NFT (can be null)
 $lastMintedId = null;
 
-$nftHandler = new \Inmarelibero\NFTManager\NFTManager(getcwd());
+$nftHandler = new \Inmarelibero\NFTManager\NFTManager();
 
 /*
  * renumber IDs

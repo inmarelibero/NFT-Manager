@@ -3,6 +3,7 @@
 namespace Inmarelibero\NFTManager;
 
 use Inmarelibero\NFTManager\Exception\AppException;
+use Inmarelibero\NFTManager\Helper\FileSystemHelper;
 use Inmarelibero\NFTManager\Operation\OperationInterface;
 
 /**
@@ -16,8 +17,10 @@ class NFTManager extends NFTManagerAbstract
      * @param string $projectRoot
      * @throws AppException
      */
-    public function __construct(string $projectRoot)
+    public function __construct()
     {
+        $projectRoot = FileSystemHelper::getRunScriptDirectory();
+
         // set project root
         $this->setProjectRoot($projectRoot);
 
@@ -75,25 +78,17 @@ class NFTManager extends NFTManagerAbstract
 
             $options['iteration_index'] = $i;
             $options = $this->resolveOptions($operation, $options);
-//            /*
-//             * manipulate $operationOptions
-//             */
-//            if (in_array(get_class($operation), [
-//                OperationFillHoles::class,
-//                OperationRenumbering::class,
-//                OperationShuffle::class,
-//            ])) {
-//                $operationOptions['iteration_index'] = $i;
-//            }
 
             /*
              * skip if necessary
              */
-            if ($options['from_id'] !== null) {
-                if ($tokenId < $options['from_id']) {
-                    $operation->onSkip($nft);
-                    continue;
-                }
+            if (
+                ($options['from_id'] !== null && $tokenId < $options['from_id'])
+                ||
+                ($options['to_id'] !== null && $tokenId > $options['to_id'])
+            ) {
+                $operation->onSkip($nft);
+                continue;
             }
 
 
@@ -133,11 +128,23 @@ class NFTManager extends NFTManagerAbstract
          * skip NFTs with ID less than this value
          */
         if (array_key_exists('from_id', $dd)) {
-            throw new AppException('Define on Operation an option called "iteration_index" is forbidden.');
+            throw new AppException('Define on Operation an option called "from_id" is forbidden.');
         }
 
         $optionsResolver->setDefault('from_id', null);
         $optionsResolver->setAllowedTypes('from_id', ['null', 'int']);
+
+        /*
+         * add "to_id" to handled options
+         *
+         * skip NFTs with ID greater than this value
+         */
+        if (array_key_exists('to_id', $dd)) {
+            throw new AppException('Define on Operation an option called "to_id" is forbidden.');
+        }
+
+        $optionsResolver->setDefault('to_id', null);
+        $optionsResolver->setAllowedTypes('to_id', ['null', 'int']);
 
         return $optionsResolver->resolve($options);
     }

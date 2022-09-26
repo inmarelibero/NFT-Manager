@@ -29,7 +29,7 @@ class OperationObfuscation extends OperationAbstract
                  */
                 'placeholder_value' => '?',
             ])
-            ->setAllowedTypes('placeholder_image_absolute_path', ['string'])
+            ->setAllowedTypes('placeholder_image_absolute_path', ['string', 'null'])
             ->setRequired('placeholder_image_absolute_path')
             ->setAllowedTypes('placeholder_value', ['string'])
             ->setRequired('placeholder_value')
@@ -43,7 +43,11 @@ class OperationObfuscation extends OperationAbstract
      */
     public function handleImage(NFT $nft, array $options = []): void
     {
-        $sourceImagePath = $options['placeholder_image_absolute_path'];
+        $sourceImagePath = $nft->getImageAbsolutePath();
+
+        if ($options['placeholder_image_absolute_path'] !== null) {
+            $sourceImagePath = $options['placeholder_image_absolute_path'];
+        }
 
         // write image
         $this->writeImageIntoOutputFolder($nft->getTokenID(), $sourceImagePath);

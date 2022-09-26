@@ -3,7 +3,6 @@
 namespace Inmarelibero\NFTManager\Helper;
 
 use Inmarelibero\NFTManager\Exception\AppException;
-use Inmarelibero\NFTManager\Exception\FileNotFoundException;
 use Inmarelibero\NFTManager\Exception\FilesystemException;
 
 /**
@@ -12,6 +11,21 @@ use Inmarelibero\NFTManager\Exception\FilesystemException;
  */
 class FileSystemHelper
 {
+    /**
+     * @return string
+     */
+    public static function getRunScriptDirectory(): string
+    {
+        $pwd = $_SERVER['PWD'];
+        $scriptFilename = $_SERVER['SCRIPT_FILENAME'];
+
+        $absolutePath = $pwd.DIRECTORY_SEPARATOR.$scriptFilename;
+        $tokens = explode(DIRECTORY_SEPARATOR, $absolutePath);
+        array_pop($tokens);
+
+        return implode(DIRECTORY_SEPARATOR, $tokens);
+    }
+
     /**
      * Delete (if existing) a directory and its content, and then recreate it empty
      *

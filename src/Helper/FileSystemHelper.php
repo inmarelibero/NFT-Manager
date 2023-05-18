@@ -147,6 +147,7 @@ class FileSystemHelper
         });
 
         asort($output, SORT_NUMERIC);
+
         $output = array_combine(range(0, count($output)-1), $output);
 
         // build absolute path

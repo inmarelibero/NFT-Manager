@@ -13,22 +13,6 @@ use Inmarelibero\NFTManager\Operation\OperationInterface;
 class NFTManager extends NFTManagerAbstract
 {
     /**
-     * NFTManager constructor.
-     * @param string $projectRoot
-     * @throws AppException
-     */
-    public function __construct()
-    {
-        $projectRoot = FileSystemHelper::getRunScriptDirectory();
-
-        // set project root
-        $this->setProjectRoot($projectRoot);
-
-        // initialize output folder
-        $this->initOutputFolders();
-    }
-
-    /**
      * @param string $operationClass
      * @param array $operationOptions
      */

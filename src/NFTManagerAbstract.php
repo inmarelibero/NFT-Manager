@@ -7,6 +7,7 @@ use Inmarelibero\NFTManager\Exception\FilesystemException;
 use Inmarelibero\NFTManager\Helper\FileSystemHelper;
 use Inmarelibero\NFTManager\Model\NFT;
 use Inmarelibero\NFTManager\Operation\OperationInterface;
+use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Class NFTManagerAbstract
@@ -15,17 +16,117 @@ use Inmarelibero\NFTManager\Operation\OperationInterface;
 abstract class NFTManagerAbstract
 {
     /**
+     * absolute path
      * WITHOUT trailing "/"
      *
      * @var string
      */
     private $projectRoot;
 
+    /**
+     * relative path of the "input folder" (containing "images/" and "metadata/" subfolders)
+     * WITHOUT trailing "/"
+     *
+     * @var string
+     */
+    private $inputRelativePath;
+
+    /**
+     * relative path of the "images/" subfolder containing the NFT images
+     * WITHOUT trailing "/"
+     *
+     * @var string
+     */
+    private $imagesRelativePath;
+
+    /**
+     * relative path of the "images/" subfolder containing the NFT metadata
+     * WITHOUT trailing "/"
+     *
+     * @var string
+     */
+    private $metadataRelativePath;
+
+    /**
+     * Callable that will be called after reading the file containing the metadata and before
+     * parsing the content as a JSON
+     *
+     * @var callable|null
+     */
+    private $metadataParserCallable;
+
     /*
      * how many operations have been finalized
      */
     private $executedOperations = 0;
 
+    /**
+     * @param string $projectRoot
+     * @param string $inputRelativePath
+     * @param string $imagesRelativePath
+     * @param string $metadataRelativePath
+     * @param callable|null $metadataParserCallable
+     * @throws AppException
+     */
+    private function __construct(string $projectRoot, string $inputRelativePath, string $imagesRelativePath, string $metadataRelativePath, callable $metadataParserCallable = null)
+    {
+        // set project root
+        $this->setProjectRoot($projectRoot);
+
+        // set relative paths
+        $this->setInputRelativePath($inputRelativePath);
+        $this->setImagesRelativePath($imagesRelativePath);
+        $this->setMetadataRelativePath($metadataRelativePath);
+
+        $this->setMetadataParserCallable($metadataParserCallable);
+
+
+        // initialize output folder
+        $this->initOutputFolders();
+    }
+
+    /**
+     * @param array $options
+     * @return static
+     */
+    public static function build(array $options = [])
+    {
+        $options = (new OptionsResolver())
+            ->setDefaults([
+                /**
+                 * relative (to the folder containing run.php) path containing the input assets
+                 * this folder must contain subfolders "metadata" and "images"
+                 */
+                'input_relative_path' => 'input/',
+
+                /**
+                 * relative (to "input" folder) path containing the NFT images
+                 */
+                'images_relative_path' => 'images/',
+
+                /**
+                 * relative (to "input" folder) path containing the NFT metadata
+                 */
+                'metadata_relative_path' => 'metadata/',
+
+                /**
+                 * specify, if necessary, a callable that will be called after reading the file containing the metadata and before
+                 * parsing the content as a JSON
+                 *
+                 * eg. a callable to replace ' with "
+                 */
+                'metadata_parser_callable' => null,
+            ])
+            ->setAllowedTypes('input_relative_path', ['string'])
+            ->setAllowedTypes('images_relative_path', ['string'])
+            ->setAllowedTypes('metadata_relative_path', ['string'])
+            ->setAllowedTypes('metadata_parser_callable', ['null', 'callable'])
+        ->resolve($options);
+
+        $projectRoot = FileSystemHelper::getRunScriptDirectory();
+
+        return new static($projectRoot, $options['input_relative_path'], $options['images_relative_path'], $options['metadata_relative_path'], $options['metadata_parser_callable']);
+    }
 
     /**
      * @return string
@@ -45,7 +146,72 @@ abstract class NFTManagerAbstract
             throw new AppException(sprintf('Unable to set directory "%s" as project root: directory does not exist.', $projectRoot));
         }
 
-        $this->projectRoot = rtrim($projectRoot, '/');
+        $this->projectRoot = rtrim($projectRoot, DIRECTORY_SEPARATOR);
+    }
+
+    /**
+     * @return string
+     */
+    protected function getInputRelativePath(): string
+    {
+        return $this->inputRelativePath;
+    }
+
+    /**
+     * @param string $inputRelativePath
+     * @throws AppException
+     */
+    protected function setInputRelativePath(string $inputRelativePath): void
+    {
+        $this->inputRelativePath = rtrim($inputRelativePath, DIRECTORY_SEPARATOR);
+    }
+
+    /**
+     * @return string
+     */
+    public function getImagesRelativePath(): string
+    {
+        return $this->imagesRelativePath;
+    }
+
+    /**
+     * @param string $imagesRelativePath
+     */
+    protected function setImagesRelativePath(string $imagesRelativePath): void
+    {
+        $this->imagesRelativePath = rtrim($imagesRelativePath, DIRECTORY_SEPARATOR);;
+    }
+
+    /**
+     * @return string
+     */
+    public function getMetadataRelativePath(): string
+    {
+        return $this->metadataRelativePath;
+    }
+
+    /**
+     * @param string $metadataRelativePath
+     */
+    protected function setMetadataRelativePath(string $metadataRelativePath): void
+    {
+        $this->metadataRelativePath = rtrim($metadataRelativePath, DIRECTORY_SEPARATOR);;
+    }
+
+    /**
+     * @return callable|null
+     */
+    public function getMetadataParserCallable(): ?callable
+    {
+        return $this->metadataParserCallable;
+    }
+
+    /**
+     * @param callable|null $metadataParserCallable
+     */
+    protected function setMetadataParserCallable(?callable $metadataParserCallable): void
+    {
+        $this->metadataParserCallable = $metadataParserCallable;
     }
 
     /**
@@ -102,14 +268,20 @@ abstract class NFTManagerAbstract
      * Return the absolute path of the folder to user as NFT and metadata input
      *
      * Before every operation is executed, the "output" folder is copied into a temporary folder (eg. ".input-tmp")
-     * and this temporary folder is used sa input
+     * and this temporary folder is used as input
      *
      * @return string
      */
     protected function getOperationInputFolder(): string
     {
         if ($this->isBeforeFirstOperation()) {
-            return $this->getProjectRoot().'/input';
+            $absoluteInputPath = $this->getProjectRoot() . DIRECTORY_SEPARATOR . $this->getInputRelativePath();
+
+            if (!file_exists($absoluteInputPath)) {
+                throw new AppException(sprintf('Unable to set directory "%s" as input dir: directory does not exist.', $absoluteInputPath));
+            }
+
+            return $absoluteInputPath;
         }
 
         return $this->getProjectRoot().'/.input-tmp';
@@ -120,7 +292,13 @@ abstract class NFTManagerAbstract
      */
     protected function getImagesOperationInputFolder(): string
     {
-        return $this->getOperationInputFolder().'/images';
+        $relativePath = 'images/';
+
+        if ($this->isBeforeFirstOperation()) {
+            $relativePath = $this->getImagesRelativePath();
+        }
+
+        return $this->getOperationInputFolder() . DIRECTORY_SEPARATOR . $relativePath;
     }
 
     /**
@@ -128,7 +306,13 @@ abstract class NFTManagerAbstract
      */
     protected function getMetadataOperationInputFolder(): string
     {
-        return $this->getOperationInputFolder().'/metadata';
+        $relativePath = 'metadata/';
+
+        if ($this->isBeforeFirstOperation()) {
+            $relativePath = $this->getMetadataRelativePath();
+        }
+
+        return $this->getOperationInputFolder() . DIRECTORY_SEPARATOR . $relativePath;
     }
 
     /**
@@ -143,7 +327,23 @@ abstract class NFTManagerAbstract
         $output = [];
 
         foreach ($imagesPathsArray as $k => $imageFullPath) {
-            $metadata = json_decode(file_get_contents($metadataPathsArray[$k]), true);
+            $metadataPath = $metadataPathsArray[$k];
+
+            if (!file_exists($metadataPath)) {
+                throw new AppException(sprintf('Unable to find file "%s".', $metadataPath));
+            }
+
+            $fileContent = file_get_contents($metadataPath);
+
+            if (is_callable($this->getMetadataParserCallable())) {
+                $fileContent = $this->getMetadataParserCallable()($fileContent);
+            }
+
+            $metadata = json_decode($fileContent, true);
+
+            if (!$metadata) {
+                throw new AppException(sprintf('Unable to decode metadata contained in file "%s": %s.', $metadataPath, json_last_error_msg()));
+            }
 
             $output[] = new NFT($imageFullPath, $metadata);
         }

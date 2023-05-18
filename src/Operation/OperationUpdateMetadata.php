@@ -126,7 +126,7 @@ class OperationUpdateMetadata extends OperationAbstract
         // remove metadata values
         if ($options['remove_values'] !== null) {
             foreach ($options['remove_values'] as $keyToRemove) {
-                unset($metadata[(int) $keyToRemove]);
+                unset($metadata[$keyToRemove]);
             }
         }
 

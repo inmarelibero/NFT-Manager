@@ -20,14 +20,17 @@ class MetadataHelper
     {
         $attributes = $metadata['attributes'];
 
-        $traitTypeExists = count(array_filter($attributes, function ($traits) use ($traitType) {
-            return array_key_exists($traitType, $traits);
+        $traitTypeExists = count(array_filter($attributes, function ($traitTypeAndValue) use ($traitType) {
+            return $traitTypeAndValue['trait_type'] === $traitType;
         })) > 0;
 
         if ($traitTypeExists) {
             foreach ($attributes as $k => $attribute) {
                 if ($attribute['trait_type'] === $traitType) {
-                    unset($attributes[$k]);
+                    $attributes[$k] = [
+                        "trait_type" => $traitType,
+                        "value" => $value,
+                    ];
                 }
             }
         } else {
@@ -51,8 +54,8 @@ class MetadataHelper
     {
         $attributes = $metadata['attributes'];
 
-        $traitTypeExists = count(array_filter($attributes, function ($traits) use ($traitType) {
-            return array_key_exists($traitType, $traits);
+        $traitTypeExists = count(array_filter($attributes, function ($traitTypeAndValue) use ($traitType) {
+            return $traitTypeAndValue['trait_type'] === $traitType;
         })) > 0;
 
         if ($traitTypeExists) {
